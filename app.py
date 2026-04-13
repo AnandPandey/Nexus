@@ -1,13 +1,14 @@
 """
 app.py — Flask search API + minimal web UI
 """
+import os
 import sqlite3
 from collections import defaultdict
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template_string, send_from_directory
  
 from indexer import tokenize
  
-app = Flask(__name__)
+app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'frontend/dist'))
 DB_PATH = "search.db"
  
 # ─── HTML UI ──────────────────────────────────────────────────────────────────
@@ -17,7 +18,7 @@ UI_HTML = """<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PythonSearch</title>
+  <title>Nexus</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #222; }
@@ -55,7 +56,7 @@ UI_HTML = """<!DOCTYPE html>
 <body>
  
 <header>
-  <h1>&#128269; PythonSearch</h1>
+  <h1>&#128269; Nexus</h1>
   <form class="search-bar" onsubmit="doSearch(event)">
     <input id="q" type="search" placeholder="Search crawled pages…" autofocus>
     <button type="submit">Search</button>
@@ -237,5 +238,13 @@ def stats_route():
     return jsonify({"pages": pages, "terms": terms, "postings": postings})
  
  
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_react(path):
+    if path and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    return send_from_directory(app.static_folder, 'index.html')
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
