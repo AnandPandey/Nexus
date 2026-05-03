@@ -9,6 +9,20 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface ImageItem {
+  url: string;
+  alt: string;
+}
+
+export type SearchResultPageType =
+  (typeof SearchResultPageType)[keyof typeof SearchResultPageType];
+
+export const SearchResultPageType = {
+  web: "web",
+  news: "news",
+  image: "image",
+} as const;
+
 export interface SearchResult {
   id: number;
   url: string;
@@ -19,6 +33,11 @@ export interface SearchResult {
   indexedAt: string;
   favicon?: string;
   wordCount?: number;
+  pageType?: SearchResultPageType;
+  thumbnail?: string;
+  images?: ImageItem[];
+  publishedAt?: string;
+  author?: string;
 }
 
 export interface SearchResults {

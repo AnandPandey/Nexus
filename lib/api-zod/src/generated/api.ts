@@ -51,6 +51,18 @@ export const SearchResponse = zod.object({
       indexedAt: zod.coerce.date(),
       favicon: zod.string().optional(),
       wordCount: zod.number().optional(),
+      pageType: zod.enum(["web", "news", "image"]).optional(),
+      thumbnail: zod.string().optional(),
+      images: zod
+        .array(
+          zod.object({
+            url: zod.string(),
+            alt: zod.string(),
+          }),
+        )
+        .optional(),
+      publishedAt: zod.coerce.date().optional(),
+      author: zod.string().optional(),
     }),
   ),
   total: zod.number(),

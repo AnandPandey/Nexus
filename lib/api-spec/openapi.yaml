@@ -341,6 +341,17 @@ components:
       required:
         - status
 
+    ImageItem:
+      type: object
+      properties:
+        url:
+          type: string
+        alt:
+          type: string
+      required:
+        - url
+        - alt
+
     SearchResult:
       type: object
       properties:
@@ -363,6 +374,20 @@ components:
           type: string
         wordCount:
           type: integer
+        pageType:
+          type: string
+          enum: [web, news, image]
+        thumbnail:
+          type: string
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImageItem"
+        publishedAt:
+          type: string
+          format: date-time
+        author:
+          type: string
       required:
         - id
         - url

@@ -4,6 +4,7 @@ import { pagesTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { SubmitUrlBody, ListIndexedPagesQueryParams, DeleteIndexedPageParams } from "@workspace/api-zod";
 import { extractDomain, indexPage } from "../lib/indexer.js";
+import { fetchPage } from "../lib/crawler.js";
 
 const router = Router();
 
@@ -50,13 +51,40 @@ router.post("/submit", async (req, res) => {
     pageId = inserted.id;
   }
 
-  indexPage(pageId).catch((err) => {
-    req.log?.error({ err, pageId }, "Indexing failed");
-    db.update(pagesTable)
-      .set({ status: "failed" })
-      .where(eq(pagesTable.id, pageId))
-      .catch(() => {});
-  });
+  // Fetch page metadata (images, page type, etc.) and re-index in background
+  const doFullIndex = async () => {
+    try {
+      // If no content provided, fetch the page to extract rich metadata
+      if (!content) {
+        const fetched = await fetchPage(url);
+        if (fetched) {
+          await db
+            .update(pagesTable)
+            .set({
+              title: fetched.title || title || url,
+              description: fetched.description || description || "",
+              content: fetched.content,
+              images: JSON.stringify(fetched.images),
+              thumbnail: fetched.thumbnail,
+              pageType: fetched.pageType,
+              publishedAt: fetched.publishedAt ?? undefined,
+              author: fetched.author,
+              updatedAt: new Date(),
+            })
+            .where(eq(pagesTable.id, pageId));
+        }
+      }
+      await indexPage(pageId);
+    } catch (err: any) {
+      req.log?.error({ err, pageId }, "Indexing failed");
+      db.update(pagesTable)
+        .set({ status: "failed" })
+        .where(eq(pagesTable.id, pageId))
+        .catch(() => {});
+    }
+  };
+
+  doFullIndex();
 
   const [page] = await db.select().from(pagesTable).where(eq(pagesTable.id, pageId));
 

@@ -41,11 +41,103 @@ function normalizeUrl(url: string, base: string): string | null {
   }
 }
 
+function isAbsoluteImageUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function detectPageType(
+  $: ReturnType<typeof cheerio.load>,
+  url: string
+): "web" | "news" {
+  const ogType = $("meta[property='og:type']").attr("content") ?? "";
+  const articleMeta = $("meta[property='article:published_time']").attr("content");
+  const newsKeywords = $("meta[name='news_keywords']").attr("content");
+  const schemaType = $("script[type='application/ld+json']").text();
+
+  if (
+    ogType.includes("article") ||
+    articleMeta ||
+    newsKeywords ||
+    schemaType.includes('"NewsArticle"') ||
+    schemaType.includes('"Article"') ||
+    /\/(news|article|blog|post|story|press)\//i.test(url) ||
+    /\/\d{4}\/\d{2}\/\d{2}\//.test(url)
+  ) {
+    return "news";
+  }
+  return "web";
+}
+
+function extractPublishedAt($: ReturnType<typeof cheerio.load>): Date | null {
+  const candidates = [
+    $("meta[property='article:published_time']").attr("content"),
+    $("meta[name='publish-date']").attr("content"),
+    $("meta[name='date']").attr("content"),
+    $("time[datetime]").first().attr("datetime"),
+    $("meta[property='og:updated_time']").attr("content"),
+  ];
+
+  for (const c of candidates) {
+    if (c) {
+      const d = new Date(c);
+      if (!isNaN(d.getTime())) return d;
+    }
+  }
+  return null;
+}
+
+function extractImages(
+  $: ReturnType<typeof cheerio.load>,
+  baseUrl: string
+): Array<{ url: string; alt: string }> {
+  const images: Array<{ url: string; alt: string }> = [];
+  const seen = new Set<string>();
+
+  // og:image first (highest quality thumbnail)
+  const ogImage = $("meta[property='og:image']").attr("content");
+  if (ogImage) {
+    const resolved = normalizeUrl(ogImage, baseUrl);
+    if (resolved && isAbsoluteImageUrl(resolved) && !seen.has(resolved)) {
+      seen.add(resolved);
+      images.push({ url: resolved, alt: $("meta[property='og:image:alt']").attr("content") ?? "" });
+    }
+  }
+
+  // Gather <img> tags, prefer larger ones
+  $("img").each((_, el) => {
+    const src = $(el).attr("src") ?? $(el).attr("data-src") ?? "";
+    const alt = $(el).attr("alt") ?? "";
+    if (!src || src.startsWith("data:")) return;
+    const resolved = normalizeUrl(src, baseUrl);
+    if (!resolved || !isAbsoluteImageUrl(resolved) || seen.has(resolved)) return;
+
+    const ext = resolved.toLowerCase();
+    if (ext.includes(".svg") || ext.includes(".gif") || ext.includes("icon") || ext.includes("logo")) return;
+
+    seen.add(resolved);
+    images.push({ url: resolved, alt });
+
+    if (images.length >= 10) return false;
+  });
+
+  return images;
+}
+
 export async function fetchPage(url: string): Promise<{
   title: string;
   description: string;
   content: string;
   links: string[];
+  images: Array<{ url: string; alt: string }>;
+  thumbnail: string;
+  pageType: "web" | "news";
+  publishedAt: Date | null;
+  author: string;
 } | null> {
   try {
     const controller = new AbortController();
@@ -70,7 +162,7 @@ export async function fetchPage(url: string): Promise<{
     const html = await response.text();
     const $ = cheerio.load(html);
 
-    $("script, style, nav, footer, header, aside, [role=navigation]").remove();
+    $("script, style, [role=navigation]").remove();
 
     const title =
       $("meta[property='og:title']").attr("content") ||
@@ -84,7 +176,14 @@ export async function fetchPage(url: string): Promise<{
       $("p").first().text().trim().slice(0, 300) ||
       "";
 
-    const content = $("body").text().replace(/\s+/g, " ").trim().slice(0, 5000);
+    const author =
+      $("meta[name='author']").attr("content") ||
+      $("meta[property='article:author']").attr("content") ||
+      $("[rel='author']").first().text().trim() ||
+      "";
+
+    $("nav, footer, header, aside").remove();
+    const content = $("body").text().replace(/\s+/g, " ").trim().slice(0, 8000);
 
     const links: string[] = [];
     $("a[href]").each((_, el) => {
@@ -96,7 +195,12 @@ export async function fetchPage(url: string): Promise<{
       }
     });
 
-    return { title, description, content, links };
+    const images = extractImages($, url);
+    const thumbnail = images.length > 0 ? images[0].url : "";
+    const pageType = detectPageType($, url);
+    const publishedAt = extractPublishedAt($);
+
+    return { title, description, content, links, images, thumbnail, pageType, publishedAt, author };
   } catch {
     return null;
   }
@@ -200,6 +304,11 @@ export async function startCrawlSession(sessionId: number): Promise<void> {
             title: pageData.title,
             description: pageData.description,
             content: pageData.content,
+            images: JSON.stringify(pageData.images),
+            thumbnail: pageData.thumbnail,
+            pageType: pageData.pageType,
+            publishedAt: pageData.publishedAt ?? undefined,
+            author: pageData.author,
             status: "pending",
             updatedAt: new Date(),
           })
@@ -213,6 +322,11 @@ export async function startCrawlSession(sessionId: number): Promise<void> {
             description: pageData.description,
             content: pageData.content,
             domain,
+            images: JSON.stringify(pageData.images),
+            thumbnail: pageData.thumbnail,
+            pageType: pageData.pageType,
+            publishedAt: pageData.publishedAt ?? undefined,
+            author: pageData.author,
             status: "pending",
           })
           .returning({ id: pagesTable.id });
