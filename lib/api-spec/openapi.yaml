@@ -3,13 +3,19 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Nexus Search Engine API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: search
+    description: Search operations
+  - name: index
+    description: Indexing operations
+  - name: stats
+    description: Statistics operations
 paths:
   /healthz:
     get:
@@ -24,6 +30,197 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /search:
+    get:
+      operationId: search
+      tags: [search]
+      summary: Search indexed pages
+      description: Full-text search with TF-IDF ranking and pagination
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: Page number (1-based)
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+          description: Results per page
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, web, news, images]
+            default: all
+          description: Search type filter
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResults"
+
+  /search/suggestions:
+    get:
+      operationId: getSearchSuggestions
+      tags: [search]
+      summary: Autocomplete suggestions
+      description: Returns query suggestions based on indexed content
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Partial query
+      responses:
+        "200":
+          description: List of suggestions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuggestionList"
+
+  /search/trending:
+    get:
+      operationId: getTrendingSearches
+      tags: [search]
+      summary: Trending searches
+      description: Returns most popular recent searches
+      responses:
+        "200":
+          description: Trending search terms
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrendingList"
+
+  /index/submit:
+    post:
+      operationId: submitUrl
+      tags: [index]
+      summary: Submit a URL for indexing
+      description: Queue a URL to be crawled and indexed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitUrlBody"
+      responses:
+        "201":
+          description: URL submitted for indexing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IndexedPage"
+        "400":
+          description: Invalid URL
+
+  /index/pages:
+    get:
+      operationId: listIndexedPages
+      tags: [index]
+      summary: List all indexed pages
+      description: Returns all pages in the search index
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, indexed, failed, all]
+            default: all
+      responses:
+        "200":
+          description: List of indexed pages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IndexedPageList"
+
+  /index/pages/{id}:
+    delete:
+      operationId: deleteIndexedPage
+      tags: [index]
+      summary: Remove a page from the index
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Page deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResult"
+        "404":
+          description: Page not found
+
+  /stats:
+    get:
+      operationId: getStats
+      tags: [stats]
+      summary: Search engine statistics
+      description: Returns overall index and search statistics
+      responses:
+        "200":
+          description: Engine statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EngineStats"
+
+  /stats/top-queries:
+    get:
+      operationId: getTopQueries
+      tags: [stats]
+      summary: Top search queries
+      description: Returns the most searched queries
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Top queries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TopQueriesList"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +231,213 @@ components:
       required:
         - status
 
+    SearchResult:
+      type: object
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        score:
+          type: number
+        domain:
+          type: string
+        indexedAt:
+          type: string
+          format: date-time
+        favicon:
+          type: string
+        wordCount:
+          type: integer
+      required:
+        - id
+        - url
+        - title
+        - description
+        - score
+        - domain
+        - indexedAt
+
+    SearchResults:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchResult"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+        query:
+          type: string
+        timeTakenMs:
+          type: number
+      required:
+        - results
+        - total
+        - page
+        - limit
+        - totalPages
+        - query
+        - timeTakenMs
+
+    SuggestionList:
+      type: object
+      properties:
+        suggestions:
+          type: array
+          items:
+            type: string
+        query:
+          type: string
+      required:
+        - suggestions
+        - query
+
+    TrendingList:
+      type: object
+      properties:
+        trending:
+          type: array
+          items:
+            type: string
+      required:
+        - trending
+
+    SubmitUrlBody:
+      type: object
+      properties:
+        url:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        content:
+          type: string
+      required:
+        - url
+
+    IndexedPage:
+      type: object
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        domain:
+          type: string
+        status:
+          type: string
+          enum: [pending, indexed, failed]
+        wordCount:
+          type: integer
+        indexedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - url
+        - title
+        - domain
+        - status
+        - createdAt
+
+    IndexedPageList:
+      type: object
+      properties:
+        pages:
+          type: array
+          items:
+            $ref: "#/components/schemas/IndexedPage"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+      required:
+        - pages
+        - total
+        - page
+        - limit
+        - totalPages
+
+    DeleteResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required:
+        - success
+        - message
+
+    EngineStats:
+      type: object
+      properties:
+        totalPages:
+          type: integer
+        indexedPages:
+          type: integer
+        pendingPages:
+          type: integer
+        failedPages:
+          type: integer
+        totalSearches:
+          type: integer
+        totalTerms:
+          type: integer
+        avgResultsPerSearch:
+          type: number
+        lastIndexedAt:
+          type: string
+          format: date-time
+      required:
+        - totalPages
+        - indexedPages
+        - pendingPages
+        - failedPages
+        - totalSearches
+        - totalTerms
+        - avgResultsPerSearch
+
+    TopQuery:
+      type: object
+      properties:
+        query:
+          type: string
+        count:
+          type: integer
+      required:
+        - query
+        - count
+
+    TopQueriesList:
+      type: object
+      properties:
+        queries:
+          type: array
+          items:
+            $ref: "#/components/schemas/TopQuery"
+      required:
+        - queries
