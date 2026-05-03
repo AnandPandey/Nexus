@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  search-engine:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./search.db:/app/search.db
+    environment:
+      - FLASK_ENV=production
