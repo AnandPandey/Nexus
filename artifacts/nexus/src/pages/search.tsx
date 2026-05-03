@@ -74,7 +74,7 @@ export default function Search() {
       
       <div className="flex items-start justify-between gap-6">
         <div className="flex-1">
-          <a href={result.url} className="block mb-1.5 group-hover:underline decoration-primary decoration-2 underline-offset-2">
+          <a href={result.url} target="_blank" rel="noopener noreferrer" className="block mb-1.5 group-hover:underline decoration-primary decoration-2 underline-offset-2">
             <h2 className="text-xl font-semibold text-primary/90 leading-tight">{result.title}</h2>
           </a>
           <p className="text-sm text-foreground/80 leading-relaxed line-clamp-2">
@@ -111,7 +111,7 @@ export default function Search() {
               )}
             </div>
             
-            <a href={result.url} className="block mb-1.5 group-hover:underline decoration-primary decoration-2 underline-offset-2">
+            <a href={result.url} target="_blank" rel="noopener noreferrer" className="block mb-1.5 group-hover:underline decoration-primary decoration-2 underline-offset-2">
               <h2 className="text-lg font-bold text-foreground/90 leading-snug">{result.title}</h2>
             </a>
             
