@@ -139,35 +139,29 @@ export default function Search() {
     );
   };
 
-  const renderImageResult = (result: SearchResult) => {
-    const imageUrl = result.thumbnail || (result.images && result.images.length > 0 ? result.images[0].url : null);
-    
-    return (
-      <a 
-        key={result.id} 
-        href={result.url} 
-        target="_blank" 
-        rel="noopener noreferrer"
-        className="group relative block rounded-xl overflow-hidden border border-border bg-card/50 aspect-[4/3] hover:shadow-md transition-all duration-150"
-      >
-        {imageUrl ? (
-          <img src={imageUrl} alt={result.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-        ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center bg-muted/20 text-muted-foreground p-4 text-center">
-            <Camera className="w-8 h-8 mb-2 opacity-50" />
-            <span className="text-xs line-clamp-2">{result.title}</span>
-          </div>
-        )}
-        
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex flex-col justify-end p-3">
-          <div className="text-xs text-white/80 flex items-center gap-1.5 mb-1">
-            {result.favicon && <img src={result.favicon} alt="" className="w-3 h-3 rounded-sm" />}
-            <span className="truncate">{result.domain}</span>
-          </div>
-          <div className="text-sm font-medium text-white line-clamp-1">{result.title}</div>
-        </div>
-      </a>
-    );
+  const buildFlatImages = (results: SearchResult[]) => {
+    const flat: Array<{ url: string; alt: string; sourceTitle: string; sourceUrl: string; sourceDomain: string; sourceFavicon: string }> = [];
+    for (const result of results) {
+      const imgs: Array<{ url: string; alt: string }> = [];
+      if (result.images && result.images.length > 0) {
+        imgs.push(...result.images);
+      } else if (result.thumbnail) {
+        imgs.push({ url: result.thumbnail, alt: result.title });
+      }
+      for (const img of imgs) {
+        if (img.url && img.url.startsWith("http")) {
+          flat.push({
+            url: img.url,
+            alt: img.alt || result.title,
+            sourceTitle: result.title || result.url,
+            sourceUrl: result.url,
+            sourceDomain: result.domain,
+            sourceFavicon: result.favicon || "",
+          });
+        }
+      }
+    }
+    return flat;
   };
 
   return (
@@ -234,11 +228,44 @@ export default function Search() {
               Found {resultsData.total.toLocaleString()} results in {resultsData.timeTakenMs.toFixed(0)}ms
             </div>
 
-            {type === SearchType.images ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {resultsData.results.map(renderImageResult)}
-              </div>
-            ) : type === SearchType.news ? (
+            {type === SearchType.images ? (() => {
+              const flatImages = buildFlatImages(resultsData.results);
+              return flatImages.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {flatImages.map((img, i) => (
+                    <a
+                      key={i}
+                      href={img.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group relative block rounded-xl overflow-hidden border border-border bg-card/50 aspect-[4/3] hover:shadow-md transition-all duration-150"
+                    >
+                      <img
+                        src={img.url}
+                        alt={img.alt}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = "none"; }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex flex-col justify-end p-3">
+                        <div className="text-xs text-white/80 flex items-center gap-1.5 mb-1">
+                          {img.sourceFavicon && <img src={img.sourceFavicon} alt="" className="w-3 h-3 rounded-sm" />}
+                          <span className="truncate">{img.sourceDomain}</span>
+                        </div>
+                        <div className="text-sm font-medium text-white line-clamp-1">{img.sourceTitle}</div>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-20 text-center border border-border/50 rounded-xl bg-card max-w-3xl">
+                  <ImageIcon className="w-12 h-12 mx-auto text-muted-foreground/30 mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No images found</h3>
+                  <p className="text-muted-foreground text-sm max-w-md mx-auto">
+                    Try crawling image-rich pages like Wikipedia or news sites.
+                  </p>
+                </div>
+              );
+            })() : type === SearchType.news ? (
               <div className="flex flex-col space-y-8">
                 {resultsData.results.map(renderNewsResult)}
               </div>

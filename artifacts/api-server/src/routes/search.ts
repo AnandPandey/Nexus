@@ -25,17 +25,21 @@ router.get("/", async (req, res) => {
     return res.json(emptyResult);
   }
 
-  // For "images" type, search pages that have thumbnails
+  // Build type filter
+  const newsFilter = eq(pagesTable.pageType, "news");
+  const webFilter = eq(pagesTable.pageType, "web");
+  const hasImagesFilter = sql`(${pagesTable.thumbnail} != '' OR ${pagesTable.images} != '[]')`;
+
   const typeFilter =
-    type === "web" ? eq(pagesTable.pageType, "web") :
-    type === "news" ? eq(pagesTable.pageType, "news") :
-    type === "images" ? sql`${pagesTable.thumbnail} != ''` :
+    type === "web" ? webFilter :
+    type === "news" ? newsFilter :
+    type === "images" ? hasImagesFilter :
     undefined;
 
   const totalDocsResult = await db
     .select({ count: sql<number>`count(*)` })
     .from(pagesTable)
-    .where(typeFilter ? and(eq(pagesTable.status, "indexed"), typeFilter) : eq(pagesTable.status, "indexed"));
+    .where(eq(pagesTable.status, "indexed"));
   const totalDocs = Number(totalDocsResult[0]?.count ?? 1);
 
   const matchedTerms = await db
@@ -70,21 +74,31 @@ router.get("/", async (req, res) => {
 
   // Get all candidate page IDs and fetch with type filter
   const candidateIds = [...pageScores.keys()];
-  const whereClause = typeFilter
-    ? and(inArray(pagesTable.id, candidateIds), typeFilter, eq(pagesTable.status, "indexed"))
-    : and(inArray(pagesTable.id, candidateIds), eq(pagesTable.status, "indexed"));
 
-  const pages = await db.select().from(pagesTable).where(whereClause);
+  const fetchPages = async (filter: typeof typeFilter) => {
+    const whereClause = filter
+      ? and(inArray(pagesTable.id, candidateIds), filter, eq(pagesTable.status, "indexed"))
+      : and(inArray(pagesTable.id, candidateIds), eq(pagesTable.status, "indexed"));
+    return db.select().from(pagesTable).where(whereClause);
+  };
+
+  let pages = await fetchPages(typeFilter);
+
+  // Fallback: if a typed search returns nothing, return all matching pages
+  // (e.g. searching "Modi" on News tab returns web pages about Modi if no news indexed)
+  let isFallback = false;
+  if (pages.length === 0 && typeFilter) {
+    pages = await fetchPages(undefined);
+    isFallback = true;
+  }
 
   // Sort by TF-IDF score; for news, also boost recent articles
-  const pageMap = new Map(pages.map((p) => [p.id, p]));
   const scoredPages = pages.map((p) => {
     let score = pageScores.get(p.id) ?? 0;
-    // Boost news articles by recency
-    if (type === "news" && p.publishedAt) {
+    if ((type === "news" || p.pageType === "news") && p.publishedAt) {
       const ageMs = Date.now() - p.publishedAt.getTime();
       const ageDays = ageMs / (1000 * 60 * 60 * 24);
-      score += Math.max(0, 2 - ageDays / 30); // bonus decays over 60 days
+      score += Math.max(0, 2 - ageDays / 30);
     }
     return { page: p, score };
   });
