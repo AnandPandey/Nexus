@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Search from "@/pages/search";
 import Indexer from "@/pages/indexer";
+import CrawlerPage from "@/pages/crawler";
 import Stats from "@/pages/stats";
 
 const queryClient = new QueryClient({
@@ -24,6 +25,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/search" component={Search} />
       <Route path="/index" component={Indexer} />
+      <Route path="/crawler" component={CrawlerPage} />
       <Route path="/stats" component={Stats} />
       <Route component={NotFound} />
     </Switch>

@@ -101,6 +101,69 @@ export interface TopQueriesList {
   queries: TopQuery[];
 }
 
+export interface StartCrawlBody {
+  seedUrl: string;
+  maxDepth?: number;
+  maxPages?: number;
+}
+
+export type CrawlSessionStatus =
+  (typeof CrawlSessionStatus)[keyof typeof CrawlSessionStatus];
+
+export const CrawlSessionStatus = {
+  running: "running",
+  completed: "completed",
+  stopped: "stopped",
+  failed: "failed",
+} as const;
+
+export interface CrawlSession {
+  id: number;
+  seedUrl: string;
+  maxDepth: number;
+  maxPages: number;
+  pagesFound: number;
+  pagesIndexed: number;
+  pagesFailed: number;
+  status: CrawlSessionStatus;
+  error?: string;
+  startedAt: string;
+  completedAt?: string;
+}
+
+export interface CrawlSessionList {
+  sessions: CrawlSession[];
+  total: number;
+}
+
+export type CrawlQueueItemStatus =
+  (typeof CrawlQueueItemStatus)[keyof typeof CrawlQueueItemStatus];
+
+export const CrawlQueueItemStatus = {
+  pending: "pending",
+  processing: "processing",
+  done: "done",
+  failed: "failed",
+  skipped: "skipped",
+} as const;
+
+export interface CrawlQueueItem {
+  id: number;
+  sessionId: number;
+  url: string;
+  depth: number;
+  status: CrawlQueueItemStatus;
+  parentUrl?: string;
+  error?: string;
+  createdAt: string;
+  processedAt?: string;
+}
+
+export interface CrawlQueueList {
+  items: CrawlQueueItem[];
+  total: number;
+}
+
 export type SearchParams = {
   /**
    * Search query
@@ -154,4 +217,9 @@ export const ListIndexedPagesStatus = {
 
 export type GetTopQueriesParams = {
   limit?: number;
+};
+
+export type GetCrawlQueueParams = {
+  limit?: number;
+  offset?: number;
 };

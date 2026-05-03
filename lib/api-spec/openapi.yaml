@@ -16,6 +16,8 @@ tags:
     description: Indexing operations
   - name: stats
     description: Statistics operations
+  - name: crawler
+    description: Web crawler operations
 paths:
   /healthz:
     get:
@@ -220,6 +222,114 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TopQueriesList"
+
+  /crawler/start:
+    post:
+      operationId: startCrawl
+      tags: [crawler]
+      summary: Start a crawl session
+      description: Starts crawling from a seed URL and indexes discovered pages
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartCrawlBody"
+      responses:
+        "201":
+          description: Crawl session started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CrawlSession"
+        "400":
+          description: Invalid URL
+
+  /crawler/stop/{id}:
+    post:
+      operationId: stopCrawl
+      tags: [crawler]
+      summary: Stop a crawl session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Session stopped
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CrawlSession"
+        "404":
+          description: Session not found
+
+  /crawler/sessions:
+    get:
+      operationId: listCrawlSessions
+      tags: [crawler]
+      summary: List all crawl sessions
+      responses:
+        "200":
+          description: List of sessions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CrawlSessionList"
+
+  /crawler/sessions/{id}:
+    get:
+      operationId: getCrawlSession
+      tags: [crawler]
+      summary: Get a single crawl session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Session details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CrawlSession"
+        "404":
+          description: Not found
+
+  /crawler/sessions/{id}/queue:
+    get:
+      operationId: getCrawlQueue
+      tags: [crawler]
+      summary: Get the crawl queue for a session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Queue items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CrawlQueueList"
 
 components:
   schemas:
@@ -441,3 +551,114 @@ components:
             $ref: "#/components/schemas/TopQuery"
       required:
         - queries
+
+    StartCrawlBody:
+      type: object
+      properties:
+        seedUrl:
+          type: string
+        maxDepth:
+          type: integer
+          default: 2
+        maxPages:
+          type: integer
+          default: 30
+      required:
+        - seedUrl
+
+    CrawlSession:
+      type: object
+      properties:
+        id:
+          type: integer
+        seedUrl:
+          type: string
+        maxDepth:
+          type: integer
+        maxPages:
+          type: integer
+        pagesFound:
+          type: integer
+        pagesIndexed:
+          type: integer
+        pagesFailed:
+          type: integer
+        status:
+          type: string
+          enum: [running, completed, stopped, failed]
+        error:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - seedUrl
+        - maxDepth
+        - maxPages
+        - pagesFound
+        - pagesIndexed
+        - pagesFailed
+        - status
+        - startedAt
+
+    CrawlSessionList:
+      type: object
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/CrawlSession"
+        total:
+          type: integer
+      required:
+        - sessions
+        - total
+
+    CrawlQueueItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        sessionId:
+          type: integer
+        url:
+          type: string
+        depth:
+          type: integer
+        status:
+          type: string
+          enum: [pending, processing, done, failed, skipped]
+        parentUrl:
+          type: string
+        error:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        processedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - sessionId
+        - url
+        - depth
+        - status
+        - createdAt
+
+    CrawlQueueList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CrawlQueueItem"
+        total:
+          type: integer
+      required:
+        - items
+        - total

@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Hexagon, Activity, Database, HeartPulse } from "lucide-react";
+import { Hexagon, Activity, Database, HeartPulse, Network } from "lucide-react";
 import { useHealthCheck, getHealthCheckQueryKey } from "@workspace/api-client-react";
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -25,6 +25,13 @@ export function Layout({ children }: { children: ReactNode }) {
             >
               <Database className="w-4 h-4" />
               Indexer
+            </Link>
+            <Link 
+              href="/crawler" 
+              className={`flex items-center gap-2 transition-colors hover:text-primary ${location === '/crawler' ? 'text-primary font-medium' : 'text-muted-foreground'}`}
+            >
+              <Network className="w-4 h-4" />
+              Crawler
             </Link>
             <Link 
               href="/stats" 

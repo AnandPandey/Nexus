@@ -174,3 +174,112 @@ export const GetTopQueriesResponse = zod.object({
     }),
   ),
 });
+
+/**
+ * Starts crawling from a seed URL and indexes discovered pages
+ * @summary Start a crawl session
+ */
+export const startCrawlBodyMaxDepthDefault = 2;
+export const startCrawlBodyMaxPagesDefault = 30;
+
+export const StartCrawlBody = zod.object({
+  seedUrl: zod.string(),
+  maxDepth: zod.number().default(startCrawlBodyMaxDepthDefault),
+  maxPages: zod.number().default(startCrawlBodyMaxPagesDefault),
+});
+
+/**
+ * @summary Stop a crawl session
+ */
+export const StopCrawlParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const StopCrawlResponse = zod.object({
+  id: zod.number(),
+  seedUrl: zod.string(),
+  maxDepth: zod.number(),
+  maxPages: zod.number(),
+  pagesFound: zod.number(),
+  pagesIndexed: zod.number(),
+  pagesFailed: zod.number(),
+  status: zod.enum(["running", "completed", "stopped", "failed"]),
+  error: zod.string().optional(),
+  startedAt: zod.coerce.date(),
+  completedAt: zod.coerce.date().optional(),
+});
+
+/**
+ * @summary List all crawl sessions
+ */
+export const ListCrawlSessionsResponse = zod.object({
+  sessions: zod.array(
+    zod.object({
+      id: zod.number(),
+      seedUrl: zod.string(),
+      maxDepth: zod.number(),
+      maxPages: zod.number(),
+      pagesFound: zod.number(),
+      pagesIndexed: zod.number(),
+      pagesFailed: zod.number(),
+      status: zod.enum(["running", "completed", "stopped", "failed"]),
+      error: zod.string().optional(),
+      startedAt: zod.coerce.date(),
+      completedAt: zod.coerce.date().optional(),
+    }),
+  ),
+  total: zod.number(),
+});
+
+/**
+ * @summary Get a single crawl session
+ */
+export const GetCrawlSessionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetCrawlSessionResponse = zod.object({
+  id: zod.number(),
+  seedUrl: zod.string(),
+  maxDepth: zod.number(),
+  maxPages: zod.number(),
+  pagesFound: zod.number(),
+  pagesIndexed: zod.number(),
+  pagesFailed: zod.number(),
+  status: zod.enum(["running", "completed", "stopped", "failed"]),
+  error: zod.string().optional(),
+  startedAt: zod.coerce.date(),
+  completedAt: zod.coerce.date().optional(),
+});
+
+/**
+ * @summary Get the crawl queue for a session
+ */
+export const GetCrawlQueueParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const getCrawlQueueQueryLimitDefault = 50;
+export const getCrawlQueueQueryOffsetDefault = 0;
+
+export const GetCrawlQueueQueryParams = zod.object({
+  limit: zod.coerce.number().default(getCrawlQueueQueryLimitDefault),
+  offset: zod.coerce.number().default(getCrawlQueueQueryOffsetDefault),
+});
+
+export const GetCrawlQueueResponse = zod.object({
+  items: zod.array(
+    zod.object({
+      id: zod.number(),
+      sessionId: zod.number(),
+      url: zod.string(),
+      depth: zod.number(),
+      status: zod.enum(["pending", "processing", "done", "failed", "skipped"]),
+      parentUrl: zod.string().optional(),
+      error: zod.string().optional(),
+      createdAt: zod.coerce.date(),
+      processedAt: zod.coerce.date().optional(),
+    }),
+  ),
+  total: zod.number(),
+});

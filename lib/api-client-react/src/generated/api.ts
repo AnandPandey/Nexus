@@ -17,8 +17,12 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  CrawlQueueList,
+  CrawlSession,
+  CrawlSessionList,
   DeleteResult,
   EngineStats,
+  GetCrawlQueueParams,
   GetSearchSuggestionsParams,
   GetTopQueriesParams,
   HealthStatus,
@@ -27,6 +31,7 @@ import type {
   ListIndexedPagesParams,
   SearchParams,
   SearchResults,
+  StartCrawlBody,
   SubmitUrlBody,
   SuggestionList,
   TopQueriesList,
@@ -802,6 +807,451 @@ export function useGetTopQueries<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetTopQueriesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Starts crawling from a seed URL and indexes discovered pages
+ * @summary Start a crawl session
+ */
+export const getStartCrawlUrl = () => {
+  return `/api/crawler/start`;
+};
+
+export const startCrawl = async (
+  startCrawlBody: StartCrawlBody,
+  options?: RequestInit,
+): Promise<CrawlSession> => {
+  return customFetch<CrawlSession>(getStartCrawlUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(startCrawlBody),
+  });
+};
+
+export const getStartCrawlMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof startCrawl>>,
+    TError,
+    { data: BodyType<StartCrawlBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof startCrawl>>,
+  TError,
+  { data: BodyType<StartCrawlBody> },
+  TContext
+> => {
+  const mutationKey = ["startCrawl"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof startCrawl>>,
+    { data: BodyType<StartCrawlBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return startCrawl(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type StartCrawlMutationResult = NonNullable<
+  Awaited<ReturnType<typeof startCrawl>>
+>;
+export type StartCrawlMutationBody = BodyType<StartCrawlBody>;
+export type StartCrawlMutationError = ErrorType<void>;
+
+/**
+ * @summary Start a crawl session
+ */
+export const useStartCrawl = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof startCrawl>>,
+    TError,
+    { data: BodyType<StartCrawlBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof startCrawl>>,
+  TError,
+  { data: BodyType<StartCrawlBody> },
+  TContext
+> => {
+  return useMutation(getStartCrawlMutationOptions(options));
+};
+
+/**
+ * @summary Stop a crawl session
+ */
+export const getStopCrawlUrl = (id: number) => {
+  return `/api/crawler/stop/${id}`;
+};
+
+export const stopCrawl = async (
+  id: number,
+  options?: RequestInit,
+): Promise<CrawlSession> => {
+  return customFetch<CrawlSession>(getStopCrawlUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getStopCrawlMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof stopCrawl>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof stopCrawl>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["stopCrawl"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof stopCrawl>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return stopCrawl(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type StopCrawlMutationResult = NonNullable<
+  Awaited<ReturnType<typeof stopCrawl>>
+>;
+
+export type StopCrawlMutationError = ErrorType<void>;
+
+/**
+ * @summary Stop a crawl session
+ */
+export const useStopCrawl = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof stopCrawl>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof stopCrawl>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getStopCrawlMutationOptions(options));
+};
+
+/**
+ * @summary List all crawl sessions
+ */
+export const getListCrawlSessionsUrl = () => {
+  return `/api/crawler/sessions`;
+};
+
+export const listCrawlSessions = async (
+  options?: RequestInit,
+): Promise<CrawlSessionList> => {
+  return customFetch<CrawlSessionList>(getListCrawlSessionsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListCrawlSessionsQueryKey = () => {
+  return [`/api/crawler/sessions`] as const;
+};
+
+export const getListCrawlSessionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCrawlSessions>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listCrawlSessions>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListCrawlSessionsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listCrawlSessions>>
+  > = ({ signal }) => listCrawlSessions({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listCrawlSessions>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListCrawlSessionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listCrawlSessions>>
+>;
+export type ListCrawlSessionsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all crawl sessions
+ */
+
+export function useListCrawlSessions<
+  TData = Awaited<ReturnType<typeof listCrawlSessions>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listCrawlSessions>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListCrawlSessionsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get a single crawl session
+ */
+export const getGetCrawlSessionUrl = (id: number) => {
+  return `/api/crawler/sessions/${id}`;
+};
+
+export const getCrawlSession = async (
+  id: number,
+  options?: RequestInit,
+): Promise<CrawlSession> => {
+  return customFetch<CrawlSession>(getGetCrawlSessionUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetCrawlSessionQueryKey = (id: number) => {
+  return [`/api/crawler/sessions/${id}`] as const;
+};
+
+export const getGetCrawlSessionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCrawlSession>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCrawlSession>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetCrawlSessionQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getCrawlSession>>> = ({
+    signal,
+  }) => getCrawlSession(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCrawlSession>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCrawlSessionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCrawlSession>>
+>;
+export type GetCrawlSessionQueryError = ErrorType<void>;
+
+/**
+ * @summary Get a single crawl session
+ */
+
+export function useGetCrawlSession<
+  TData = Awaited<ReturnType<typeof getCrawlSession>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCrawlSession>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCrawlSessionQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get the crawl queue for a session
+ */
+export const getGetCrawlQueueUrl = (
+  id: number,
+  params?: GetCrawlQueueParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/crawler/sessions/${id}/queue?${stringifiedParams}`
+    : `/api/crawler/sessions/${id}/queue`;
+};
+
+export const getCrawlQueue = async (
+  id: number,
+  params?: GetCrawlQueueParams,
+  options?: RequestInit,
+): Promise<CrawlQueueList> => {
+  return customFetch<CrawlQueueList>(getGetCrawlQueueUrl(id, params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetCrawlQueueQueryKey = (
+  id: number,
+  params?: GetCrawlQueueParams,
+) => {
+  return [
+    `/api/crawler/sessions/${id}/queue`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetCrawlQueueQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCrawlQueue>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  params?: GetCrawlQueueParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCrawlQueue>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetCrawlQueueQueryKey(id, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getCrawlQueue>>> = ({
+    signal,
+  }) => getCrawlQueue(id, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCrawlQueue>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCrawlQueueQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCrawlQueue>>
+>;
+export type GetCrawlQueueQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the crawl queue for a session
+ */
+
+export function useGetCrawlQueue<
+  TData = Awaited<ReturnType<typeof getCrawlQueue>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  params?: GetCrawlQueueParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCrawlQueue>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCrawlQueueQueryOptions(id, params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
