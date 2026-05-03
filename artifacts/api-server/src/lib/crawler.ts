@@ -9,9 +9,9 @@ import {
 import { eq, and, sql } from "drizzle-orm";
 import { extractDomain, indexPage } from "./indexer.js";
 
-const FETCH_TIMEOUT_MS = 10000;
+const FETCH_TIMEOUT_MS = 15000;
 const USER_AGENT =
-  "NexusBot/1.0 (custom search engine crawler; +https://nexus.example.com/bot)";
+  "Mozilla/5.0 (compatible; NexusBot/1.0; +https://nexus.example.com/bot)";
 
 const BLOCKED_EXTENSIONS = new Set([
   ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp",
@@ -128,7 +128,7 @@ function extractImages(
   return images;
 }
 
-export async function fetchPage(url: string): Promise<{
+type FetchedPage = {
   title: string;
   description: string;
   content: string;
@@ -138,8 +138,77 @@ export async function fetchPage(url: string): Promise<{
   pageType: "web" | "news";
   publishedAt: Date | null;
   author: string;
-} | null> {
+};
+
+async function fetchWikipediaPage(url: string): Promise<FetchedPage | null> {
   try {
+    const u = new URL(url);
+    // Extract page title from URL path like /wiki/Narendra_Modi
+    const match = u.pathname.match(/^\/wiki\/(.+)$/);
+    if (!match) return null;
+    const pageTitle = decodeURIComponent(match[1]);
+
+    const apiUrl = `https://${u.hostname}/api/rest_v1/page/summary/${encodeURIComponent(pageTitle)}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+    const response = await fetch(apiUrl, {
+      headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+      signal: controller.signal as any,
+    });
+    clearTimeout(timer);
+
+    if (!response.ok) return null;
+    const data = (await response.json()) as any;
+
+    const title = data.title || data.displaytitle || pageTitle;
+    // Clean up any raw Wikipedia template markup like {{about|...}}
+    const rawExtract = (data.extract || "") as string;
+    const description = rawExtract.replace(/\{\{[^}]*\}\}/g, "").trim();
+    const thumbnail = data.thumbnail?.source || "";
+    const images: Array<{ url: string; alt: string }> = thumbnail
+      ? [{ url: thumbnail, alt: title }]
+      : [];
+
+    // Also get outgoing links from the regular page for crawling
+    const linksUrl = `https://${u.hostname}/api/rest_v1/page/links/${encodeURIComponent(pageTitle)}`;
+    const links: string[] = [];
+    try {
+      const lr = await fetch(linksUrl, {
+        headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+        signal: (new AbortController()).signal as any,
+      });
+      if (lr.ok) {
+        const ld = (await lr.json()) as any;
+        for (const item of (ld.items || []).slice(0, 20)) {
+          links.push(`https://${u.hostname}/wiki/${encodeURIComponent(item.title)}`);
+        }
+      }
+    } catch { /* ignore link fetch errors */ }
+
+    return {
+      title,
+      description: description.slice(0, 500),
+      content: description,
+      links,
+      images,
+      thumbnail,
+      pageType: "web",
+      publishedAt: null,
+      author: "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchPage(url: string): Promise<FetchedPage | null> {
+  try {
+    // Use Wikipedia REST API for much better results
+    if (/^https?:\/\/[a-z]+\.wikipedia\.org\/wiki\//i.test(url)) {
+      return await fetchWikipediaPage(url);
+    }
+
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
@@ -148,6 +217,7 @@ export async function fetchPage(url: string): Promise<{
         "User-Agent": USER_AGENT,
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.5",
+        "Cache-Control": "no-cache",
       },
       redirect: "follow",
       signal: controller.signal as any,

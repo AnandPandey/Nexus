@@ -59,36 +59,41 @@ export default function Search() {
     { id: SearchType.images, label: "Images", icon: ImageIcon },
   ];
 
-  const renderWebResult = (result: SearchResult) => (
-    <div key={result.id} className="group max-w-3xl">
-      <div className="flex items-center gap-2 mb-1 text-xs">
-        {result.favicon ? (
-          <img src={result.favicon} alt="" className="w-4 h-4 rounded-sm bg-background" />
-        ) : (
-          <Globe className="w-4 h-4 text-muted-foreground" />
-        )}
-        <span className="text-muted-foreground font-medium truncate">{result.domain}</span>
-        <span className="text-muted-foreground/30">•</span>
-        <span className="text-muted-foreground/70 truncate text-[10px]">{result.url}</span>
-      </div>
-      
-      <div className="flex items-start justify-between gap-6">
-        <div className="flex-1">
-          <a href={result.url} target="_blank" rel="noopener noreferrer" className="block mb-1.5 group-hover:underline decoration-primary decoration-2 underline-offset-2">
-            <h2 className="text-xl font-semibold text-primary/90 leading-tight">{result.title}</h2>
-          </a>
-          <p className="text-sm text-foreground/80 leading-relaxed line-clamp-2">
-            {result.description}
-          </p>
+  const renderWebResult = (result: SearchResult) => {
+    const title = result.title || result.url;
+    return (
+      <div key={result.id} className="group max-w-3xl">
+        <div className="flex items-center gap-2 mb-1 text-xs">
+          {result.favicon ? (
+            <img src={result.favicon} alt="" className="w-4 h-4 rounded-sm bg-background" />
+          ) : (
+            <Globe className="w-4 h-4 text-muted-foreground" />
+          )}
+          <span className="text-muted-foreground font-medium truncate">{result.domain}</span>
+          <span className="text-muted-foreground/30">•</span>
+          <span className="text-muted-foreground/70 truncate text-[10px]">{result.url}</span>
         </div>
-        {result.thumbnail && (
-          <div className="shrink-0 mt-1">
-            <img src={result.thumbnail} alt="" className="w-[100px] h-[100px] object-cover rounded-lg border border-border/50" />
+
+        <div className="flex items-start justify-between gap-6">
+          <div className="flex-1">
+            <a href={result.url} target="_blank" rel="noopener noreferrer" className="block mb-1.5 group-hover:underline decoration-primary decoration-2 underline-offset-2">
+              <h2 className="text-xl font-semibold text-primary/90 leading-tight">{title}</h2>
+            </a>
+            {result.description && (
+              <p className="text-sm text-foreground/80 leading-relaxed line-clamp-2">
+                {result.description}
+              </p>
+            )}
           </div>
-        )}
+          {result.thumbnail && (
+            <div className="shrink-0 mt-1">
+              <img src={result.thumbnail} alt="" className="w-[100px] h-[100px] object-cover rounded-lg border border-border/50" />
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderNewsResult = (result: SearchResult) => {
     const dateStr = formatDate(result.publishedAt || result.indexedAt);
